@@ -109,7 +109,7 @@ static int8_t _vm_i8_run_stream(
         &&opcode_not,	            // 56
         &&opcode_db_load,	        // 57
         &&opcode_db_store,	        // 58
-        &&opcode_trap,	            // 59
+        &&opcode_yield_frames,      // 59
         &&opcode_trap,	            // 60
         &&opcode_trap,	            // 61
         &&opcode_trap,	            // 62
@@ -1196,6 +1196,15 @@ opcode_db_store:
 
     goto dispatch;
 
+opcode_yield_frames:
+
+    op1 = *pc++;
+
+    data[RETURN_VAL_ADDR] = op1;
+    data[RETURN_VAL_ADDR+1] = pc - stream; // figure offset out from pc
+
+    return VM_STATUS_YIELD;
+
 
 opcode_trap:
     return VM_STATUS_TRAP;
@@ -1243,19 +1252,33 @@ int8_t vm_i8_run_loop(
     cycles = 0;
     state->frame_number++;
 
-    uint8_t *code = (uint8_t *)( stream + state->code_start );
-    int32_t *data = (int32_t *)( stream + state->data_start );
+    if (state->yield_frames > 0) {
+      state->yield_frames--;
+      return VM_STATUS_OK;
+    } else {
+      uint8_t *code = (uint8_t *)( stream + state->code_start );
+      int32_t *data = (int32_t *)( stream + state->data_start );
 
-    uint16_t offset = state->loop_start;
+      // pick back up from yield location if needed
+      uint16_t offset = state->yield_next ? state->yield_next : state->loop_start;
+      state->yield_next = 0;
 
-    int8_t status = _vm_i8_run_stream( code, offset, &state->rng_seed, data );
+      int8_t status = _vm_i8_run_stream( code, offset, &state->rng_seed, data );
 
-    if( cycles > state->max_cycles ){
+      if( cycles > state->max_cycles ){
 
         state->max_cycles = cycles;        
+      }
+
+      // save yield location if that's how we stopped
+      if (status == VM_STATUS_YIELD) {
+        state->yield_frames = data[RETURN_VAL_ADDR];
+        state->yield_next = data[YIELD_NEXT_OFFSET_ADDR];
+      }
+
+      return status;
     }
 
-    return status;
 }
 
 

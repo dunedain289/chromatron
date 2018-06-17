@@ -2350,6 +2350,8 @@ class CodeGeneratorPass3(object):
 
                 elif ir.name == 'halt':
                     assert len(ir.params) == 0
+                elif ir.name == 'yield_frames':
+                    assert len(ir.params) == 1
 
         # fourth pass
         # prefix all local vars with the function's name so
@@ -3134,6 +3136,18 @@ class Halt(Instruction):
     def assemble(self):
         return [self.opcode]
 
+class YieldFrames(Instruction):
+    mnemonic = 'YIELD_FRAMES'
+    opcode = 0x3c
+
+    def __init__(self, op1):
+        self.op1 = op1
+
+    def __str__(self):
+        return "%s %s" % (self.mnemonic, self.op1)
+
+    def assemble(self):
+        return [self.opcode, self.op1.addr]
 
 class IsFading(Instruction):
     mnemonic = 'IS_FADING'
@@ -3368,6 +3382,10 @@ class CodeGeneratorPass5(object):
             elif isinstance(ir, CallIR):
                 if ir.name == 'halt':
                     ins = Halt()
+                    self.append_code(ins)
+
+                elif ir.name == 'yield_frames':
+                    ins = YieldFrames(ir.dest, ir.params[0])
                     self.append_code(ins)
 
                 elif ir.name == 'rand':
@@ -4560,6 +4578,9 @@ class VM(object):
                     pprint(self.dump_registers())
 
                 assert self.memory[ins.op1.name]
+
+            elif isinstance(ins, YieldFrames):
+                return 'yield_frames'
 
             elif isinstance(ins, Halt):
                 return 'halt'

@@ -66,6 +66,7 @@
 #define VM_STATUS_ASSERT                -99
 #define VM_STATUS_TRAP                  -100
 #define VM_STATUS_HALT                  1
+#define VM_STATUS_YIELD                 2
 
 
 #define VM_LOAD_FLAGS_CHECK_HEADER      1
@@ -135,7 +136,8 @@ typedef struct{
     uint8_t pix_obj_count;
     uint16_t pix_obj_start;
 
-    uint8_t byte0;
+    uint16_t yield_next;
+    uint16_t yield_frames;
 } vm_state_t;
 
 int8_t vm_i8_run(
